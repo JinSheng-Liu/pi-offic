@@ -1,0 +1,47 @@
+{
+  "name": "pi-docx-studio",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev:test": "node --env-file-if-exists=.env --import ./vendor/pi/packages/coding-agent/src/experimental/source-resolver.ts scripts/dev-test.mjs",
+    "check:docx": "node scripts/check-docx-engine.mjs",
+    "check:pi": "node --import ./vendor/pi/packages/coding-agent/src/experimental/source-resolver.ts scripts/check-pi-source.mjs",
+    "check:server": "node --test test/native-toc.test.mjs test/native-page-setup.test.mjs test/tab-layout.test.mjs test/model-transport.test.mjs test/context-budget.test.mjs test/history.test.mjs test/character-style.test.mjs test/named-style.test.mjs test/server.test.mjs test/editor-automation.test.mjs test/editor-reader.test.mjs test/format-replay.test.mjs test/skills.test.mjs test/object-flow.test.mjs test/footer-page-number.test.mjs test/caption-fields.test.mjs test/convert-captions.test.mjs test/numbering-operations.test.mjs test/inspection-cache.test.mjs test/table-height.test.mjs test/table-recommendation.test.mjs test/cover-layout.test.mjs test/reference-cover.test.mjs test/coverage.test.mjs test/format-plan.test.mjs test/workflow-responsiveness.test.mjs",
+    "check:ui": "node --test test/outline-refresh.test.mjs test/outline.test.mjs test/layout-review.test.mjs test/editor-interaction.test.mjs test/frontend-stream.test.mjs",
+    "check:tasks": "node --test test/task-checklist.test.mjs",
+    "check:session": "node --import ./vendor/pi/packages/coding-agent/src/experimental/source-resolver.ts --test test/pi-session.test.mjs",
+    "prepare:pi": "npm --prefix vendor/pi/packages/ai run hydrate-model-data",
+    "check:audit": "node --import ./vendor/pi/packages/coding-agent/src/experimental/source-resolver.ts scripts/deep-audit.mjs",
+    "check": "npm run check:tasks && npm run check:server && npm run check:session && npm run check:api && npm run check:ui && npm run check:docx && npm run check:pi && npm run build",
+    "dev": "node --env-file-if-exists=.env --import ./vendor/pi/packages/coding-agent/src/experimental/source-resolver.ts ./node_modules/vite/bin/vite.js --configLoader native --host 127.0.0.1",
+    "build": "vue-tsc -b && node --import ./vendor/pi/packages/coding-agent/src/experimental/source-resolver.ts ./node_modules/vite/bin/vite.js build --configLoader native",
+    "start": "node --env-file-if-exists=.env --import ./vendor/pi/packages/coding-agent/src/experimental/source-resolver.ts server/index.mjs",
+    "check:api": "node --import ./vendor/pi/packages/coding-agent/src/experimental/source-resolver.ts --test test/api.test.mjs"
+  },
+  "dependencies": {
+    "@docx-editor.dev/core": "2.33.0",
+    "@docx-editor.dev/i18n": "2.33.0",
+    "@docx-editor.dev/vue": "2.33.0",
+    "@lucide/vue": "^1.66.0",
+    "@tailwindcss/vite": "^4.3.5",
+    "@vueuse/core": "^15.0.0",
+    "@xmldom/xmldom": "0.9.12",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "fflate": "0.8.3",
+    "markdown-it": "^15.0.3",
+    "reka-ui": "^2.11.0",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.3.5",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.2.0",
+    "@types/node": "^24.10.0",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.7",
+    "vue-tsc": "^3.3.14"
+  }
+}

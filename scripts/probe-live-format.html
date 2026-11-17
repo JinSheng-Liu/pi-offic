@@ -1,0 +1,49 @@
+<!doctype html><meta charset="utf-8"><title>原位格式回归</title><link rel="icon" href="data:,">
+<style>body{margin:0;background:#ddd}#status{padding:12px;background:white}#editor{height:850px;overflow:auto}</style>
+<div id="status">初始化</div><div id="editor"></div>
+<script type="module">
+import {createDocxEditor} from '@docx-editor.dev/core'
+import {createDocumentRefresh} from '@docx-editor.dev/core/editor'
+import {replayFingerprint} from '/shared/replay-fingerprint.mjs'
+import {canonicalOoxmlFingerprint} from '@docx-editor.dev/core/store'
+import {applyFormatReplay} from '/src/lib/format-replay.ts'
+import '@docx-editor.dev/core/styles/editor.css'
+const bytes=await(await fetch('/output/live-format-probe/source.docx')).arrayBuffer()
+const replay=await(await fetch('/output/live-format-probe/replay.json')).json()
+const editor=createDocxEditor({container:document.querySelector('#editor'),document:bytes})
+await editor.save()
+window.probe={editor,replay,async partialFailure(){
+ const initial=replayFingerprint(editor.surface.session.part());let interrupted=false,done=0
+ try{await applyFormatReplay(editor,replay,n=>{done=n;throw Error('故障注入：首批后中断')})}catch{interrupted=true}
+ const changed=initial!==replayFingerprint(editor.surface.session.part())
+ const recovered=await window.probe.recover()
+ if(!interrupted||!changed||!recovered.matched)throw Error('部分修改恢复验证失败')
+ const report={interrupted,changed,done,recovered}
+ await fetch('/probe-output/report.json',{method:'POST',body:JSON.stringify(report,null,2)})
+ return report
+},async recover(){
+ const refresh=createDocumentRefresh(editor),submission=await refresh.capture()
+ const result=await refresh.applyUpdate({submission,sequence:99,bytes:await(await fetch('/output/live-format-probe/expected.docx')).arrayBuffer()})
+ refresh.finish(submission)
+ const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(replayFingerprint(editor.surface.session.part())))
+ const fingerprint=Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('')
+ return {result,matched:fingerprint===replay.after}
+},async run(){
+ const heights=()=>Array.from(document.querySelectorAll('.docx-paragraph-fragment')).slice(0,5).map(e=>e.getBoundingClientRect().height)
+ const beforeHeights=heights()
+ const original=canonicalOoxmlFingerprint(editor.surface.session.part()),generation=editor.mountGeneration,frames=[]
+ editor.setMode('view');let refused=false
+ try{await applyFormatReplay(editor,replay)}catch(e){refused=true}
+ if(!refused||canonicalOoxmlFingerprint(editor.surface.session.part())!==original)throw Error('只读保护失败')
+ editor.setMode('edit')
+ await applyFormatReplay(editor,replay,(done,total)=>{frames.push({done,total,time:performance.now(),revision:editor.surface.session.packageRevision()});document.querySelector('#status').textContent=`已原位修改 ${done}/${total} 段`})
+ const final=canonicalOoxmlFingerprint(editor.surface.session.part());let staleRefused=false
+ try{await applyFormatReplay(editor,replay)}catch{staleRefused=true}
+ if(canonicalOoxmlFingerprint(editor.surface.session.part())!==final)throw Error('过期操作改变文档')
+ const report={beforeHeights,afterHeights:heights(),readOnlyRefused:refused,staleRefused,mountUnchanged:editor.mountGeneration===generation,frames,finalMatched:true}
+ await fetch('/probe-output/formatted.docx',{method:'POST',body:await editor.save()})
+ await fetch('/probe-output/report.json',{method:'POST',body:JSON.stringify(report,null,2)})
+ return report
+}}
+document.querySelector('#status').textContent='就绪'
+</script>

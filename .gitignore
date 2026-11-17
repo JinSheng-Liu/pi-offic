@@ -1,0 +1,32 @@
+# Dependencies and generated builds
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Local credentials (keep only the empty example)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# User documents, sessions and local verification artifacts
+/data/
+/output/
+/tmp/
+/docx_qa/
+/.playwright-cli/
+/test-results/
+/playwright-report/
+coverage/
+*.log
+*.cpuprofile
+
+# Local editor / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Unrelated local animation experiment
+/pelican_bike.html

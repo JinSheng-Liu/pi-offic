@@ -1,0 +1,27 @@
+<!doctype html><meta charset="utf-8"><title>独立编辑器替代测试</title>
+<style>body{margin:0;background:#ddd}#status{padding:12px;background:white;position:sticky;top:0;z-index:10}#editor{height:850px;overflow:auto}</style>
+<div id="status">初始化独立测试，不连接产品 API</div><div id="editor"></div>
+<script type="module">
+import {createDocxEditor} from '@docx-editor.dev/core'
+import {createBrowserAutomationHost} from '@docx-editor.dev/core/editor'
+import '@docx-editor.dev/core/styles/editor.css'
+const bytes=await(await fetch('/data/documents/ea68ac07-cf3b-495a-9772-608a38afc15f/original.docx')).arrayBuffer()
+const editor=createDocxEditor({container:document.querySelector('#editor'),document:bytes})
+await editor.save()
+const host=createBrowserAutomationHost(editor)
+const q=op=>{const r=host.execute({operations:[op]});if(!r.ok)throw Error(JSON.stringify(r));return r.results[0].value}
+const body=q({op:'getBody',document:q({op:'getDocument'}).handle}).handle
+const paragraphs=q({op:'getParagraphs',body}).handles
+const target=paragraphs[16]
+const save=async name=>{const r=await fetch('/probe-output/'+name,{method:'POST',body:await editor.save()});if(!r.ok)throw Error('save failed')}
+const frame=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))
+const report={paragraphs:paragraphs.length,steps:[],limitations:['No font fidelity claim; font measurement must be checked separately']}
+window.probe={editor,host,report,async baseline(){await save('roundtrip.docx');return {paragraphs:paragraphs.length,measurement:editor.fontMeasurement?.()}},async step(value){
+ q({op:'selectSpan',span:{paragraph:target},mode:'select'})
+ const r=editor.exec({type:'setLineSpacing',rule:'multiple',value});if(!r.ok)throw Error(JSON.stringify(r))
+ await frame();const step={value,result:r,revision:host.revision(),time:performance.now()};report.steps.push(step)
+ document.querySelector('#status').textContent='已执行行距 '+value+' 倍，版本 '+step.revision
+ await save('formatted.docx');return step
+},async undo(){const r=editor.exec({type:'undo'});await frame();await save('undone.docx');report.undo=r;await fetch('/probe-output/report.json',{method:'POST',body:JSON.stringify(report,null,2)});return r}}
+document.querySelector('#status').textContent='就绪：'+paragraphs.length+' 段'
+</script>

@@ -1,0 +1,25 @@
+import {readFile,writeFile} from 'node:fs/promises'
+import assert from 'node:assert/strict'
+import {inspect} from '../server/engine.mjs'
+const base='http://127.0.0.1:5175'
+const health=await(await fetch(base+'/api/health')).json()
+assert.equal(health.testMode,true,'真实模型测试只能连接 npm run dev:test 启动的隔离服务')
+const bytes=await readFile('D:/xiangmu/agent-office/agent-office/测试文档/党政机关公文_无格式版.docx')
+const res=await fetch(base+'/api/documents?name='+encodeURIComponent('真实模型验收副本.docx'),{method:'POST',headers:{'content-type':'application/vnd.openxmlformats-officedocument.wordprocessingml.document'},body:bytes})
+assert.equal(res.status,201);const doc=await res.json()
+await writeFile('data/validation/real-document/live-id.txt',doc.id)
+const log=await readFile('data/documents/749b9681-27a8-4aea-a1ea-d9ccab7f7536/agent/sessions/2026-11-01T06-59-48-472Z_01a195e8-4078-77aa-9906-606d1f3b6ea8.jsonl','utf8')
+const user=log.trim().split('\n').map(l=>JSON.parse(l).message).find(m=>m?.role==='user')
+const prompt=typeof user.content==='string'?user.content:user.content.filter(c=>c.type==='text').map(c=>c.text).join('\n')
+const response=await fetch(base+`/api/documents/${doc.id}/chat`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({revision:1,message:prompt+'\n本次测试注意：颜色参数使用 #FF0000、#000000；居中参数使用 Centered，两端对齐使用 Justified，左对齐 Left，右对齐 Right。对于不能完成的同段标题局部格式，请明确报告未完成，不要把后面的正文也改为黑体。'})})
+assert.equal(response.status,200)
+const stream=await response.text();await writeFile('data/validation/real-document/live-events.txt',stream)
+const meta=await(await fetch(base+`/api/documents/${doc.id}`)).json()
+console.log(JSON.stringify({id:doc.id,revision:meta.revision,hasError:stream.includes('event: error')}))
+const output=Buffer.from(await(await fetch(base+`/api/documents/${doc.id}/file`)).arrayBuffer())
+await writeFile('data/validation/real-document/live-model-result.docx',output)
+const before=await inspect(bytes),after=await inspect(output)
+assert.deepEqual(after.paragraphs.map(p=>p.text),before.paragraphs.map(p=>p.text))
+await writeFile('data/validation/real-document/live-inspection.json',JSON.stringify(after,null,2))
+console.log(JSON.stringify({textPreserved:true,paragraphs:after.paragraphs.length,validation:meta.versions.at(-1)?.validation}))
+assert.ok(meta.revision>1,'模型没有生成新版本')
